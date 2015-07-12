@@ -20,52 +20,11 @@
 
 #include <clearsync/csplugin.h>
 
-class csPluginConf;
-class csPluginXmlParser : public csXmlParser
-{
-public:
-    virtual void ParseElementOpen(csXmlTag *tag);
-    virtual void ParseElementClose(csXmlTag *tag);
-};
+#include <proc/readproc.h>
 
-class csPluginProcessWatch;
-class csPluginConf : public csConf
-{
-public:
-    csPluginConf(csPluginProcessWatch *parent,
-        const char *filename, csPluginXmlParser *parser)
-        : csConf(filename, parser), parent(parent) { };
-
-    virtual void Reload(void);
-
-protected:
-    friend class csPluginXmlParser;
-
-    csPluginProcessWatch *parent;
-};
-
-void csPluginConf::Reload(void)
-{
-    csConf::Reload();
-    parser->Parse();
-}
-
-class csPluginProcessWatch : public csPlugin
-{
-public:
-    csPluginProcessWatch(const string &name,
-        csEventClient *parent, size_t stack_size);
-    virtual ~csPluginProcessWatch();
-
-    virtual void SetConfigurationFile(const string &conf_filename);
-
-    virtual void *Entry(void);
-
-protected:
-    friend class csPluginXmlParser;
-
-    csPluginConf *conf;
-};
+#include "procwatch-conf.h"
+#include "procwatch-action-group.h"
+#include "csplugin-procwatch.h"
 
 csPluginProcessWatch::csPluginProcessWatch(const string &name,
     csEventClient *parent, size_t stack_size)
@@ -77,6 +36,13 @@ csPluginProcessWatch::csPluginProcessWatch(const string &name,
 csPluginProcessWatch::~csPluginProcessWatch()
 {
     Join();
+
+    for (csProcessStateVector::iterator i = proc_state.begin();
+        i != proc_state.end(); i++) {
+        if ((*i)->pattern != NULL) delete (*i)->pattern;
+    }
+    for (csActionGroupMap::iterator i = action_group.begin();
+        i != action_group.end(); i++) delete i->second;
 
     if (conf) delete conf;
 }
@@ -93,59 +59,139 @@ void csPluginProcessWatch::SetConfigurationFile(const string &conf_filename)
 
 void *csPluginProcessWatch::Entry(void)
 {
-    csLog::Log(csLog::Info, "%s: Running.", name.c_str());
+    csLog::Log(csLog::Info, "%s: Started", name.c_str());
 
-    unsigned long loops = 0ul;
-    GetStateVar("loops", loops);
-    csLog::Log(csLog::Debug, "%s: loops: %lu", name.c_str(), loops);
+    csTimer *refresh_timer = new csTimer(_CSPLUGIN_PROCWATCH_REFRESH_TIMER,
+        conf->GetRefreshRate(), conf->GetRefreshRate(), this);
+    refresh_timer->Start();
+#if 0
+    csProcessState *proc = new csProcessState;
+    proc->type = csPMATCH_TEXT;
+    proc->text = "master";
+    proc->pattern = NULL;
+    proc->state = csPSTATE_INIT;
+    proc->event = csPEVENT_ON_TERMINATE;
+    proc->action_taken = time(NULL);
 
-    csTimer *timer = new csTimer(500, 3, 3, this);
-    timer->Start();
-
-    for (bool run = true; run; loops++) {
+    proc_state.push_back(proc);
+#endif
+    for (bool run = true; run; ) {
+        csTimer *timer;
         csEvent *event = EventPopWait();
 
-        switch (event->GetId()) {
-        case csEVENT_QUIT:
-            csLog::Log(csLog::Info, "%s: Terminated.", name.c_str());
-            run = false;
-            break;
+        if (event != NULL) {
+            switch (event->GetId()) {
+            case csEVENT_QUIT:
+                csLog::Log(csLog::Debug, "%s: Terminated.", name.c_str());
+                refresh_timer->Stop();
+                run = false;
+                break;
 
-        case csEVENT_TIMER:
-            csLog::Log(csLog::Debug, "%s: Tick: %lu", name.c_str(),
-                static_cast<csEventTimer *>(event)->GetTimer()->GetId());
-            break;
+            case csEVENT_TIMER:
+                timer = static_cast<csEventTimer *>(event)->GetTimer();
+
+                if (timer->GetId() == _CSPLUGIN_PROCWATCH_REFRESH_TIMER) {
+                    ProcessTableRefresh();
+                    ProcessStateUpdate();
+                }
+                for (csActionGroupMap::iterator i = action_group.begin();
+                    i != action_group.end(); i++) {
+                    if (*(i->second) != timer->GetId()) continue;
+                    i->second->Execute(this, parent);
+                    break;
+                }
+                break;
+            }
         }
 
-        delete event;
+        EventDestroy(event);
     }
 
-    delete timer;
-
-    SetStateVar("loops", loops);
-    csLog::Log(csLog::Debug, "%s: loops: %lu", name.c_str(), loops);
+    delete refresh_timer;
 
     return NULL;
 }
 
-void csPluginXmlParser::ParseElementOpen(csXmlTag *tag)
+void csPluginProcessWatch::ProcessTableRefresh(void)
 {
-    csPluginConf *_conf = static_cast<csPluginConf *>(conf);
+    PROCTAB *proc_tab = NULL;
+    proc_t *proc_info = NULL;
+
+    proc_map.clear();
+    proc_tab = openproc(PROC_FILLSTAT);
+
+    while (proc_tab != NULL && (proc_info = readproc(proc_tab, NULL)) != NULL) {
+        if (proc_info->ppid == 1)
+            proc_map[proc_info->cmd].push_back(proc_info->tid);
+       
+        freeproc(proc_info);
+        proc_info = NULL;
+    }
+
+    if (proc_info != NULL) freeproc(proc_info);
+    if (proc_tab != NULL) closeproc(proc_tab);
 }
 
-void csPluginXmlParser::ParseElementClose(csXmlTag *tag)
+void csPluginProcessWatch::ProcessStateUpdate(void)
 {
-    string text = tag->GetText();
-    csPluginConf *_conf = static_cast<csPluginConf *>(conf);
+    for (csProcessStateVector::iterator i = proc_state.begin();
+        i != proc_state.end(); i++) {
+        csProcessTableMap::iterator match = proc_map.end();
 
-    if ((*tag) == "test-tag") {
-        if (!stack.size() || (*stack.back()) != "plugin")
-            ParseError("unexpected tag: " + tag->GetName());
-        if (!text.size())
-            ParseError("missing value for tag: " + tag->GetName());
+        if ((*i)->type == csPMATCH_TEXT)
+            match = proc_map.find((*i)->text);
+        else if ((*i)->type == csPMATCH_PATTERN && (*i)->pattern != NULL) {
+            for (csProcessTableMap::iterator j = proc_map.begin();
+                j != proc_map.end(); j++) {
+                if ((*i)->pattern->Execute(j->first.c_str()) == 0) {
+                    match = j;
+                    break;
+                }
+            }
+        }
 
-        csLog::Log(csLog::Debug, "%s: %s",
-            tag->GetName().c_str(), text.c_str());
+        csProcessStates state = csPSTATE_NOT_RUNNING;
+        if (match != proc_map.end()) state = csPSTATE_RUNNING;
+
+        if ((*i)->state == csPSTATE_INIT)
+            (*i)->state = state;
+        else if ((*i)->state != state) {
+
+            csLog::Log(csLog::Debug, "%s: Process state changed: %d -> %d",
+                name.c_str(), (*i)->state, state);
+
+            (*i)->state = state;
+
+            if ((*i)->event == csPEVENT_ON_START &&
+                (*i)->state == csPSTATE_RUNNING)
+                ProcessStateChange((*i));
+        }
+
+        if ((*i)->event == csPEVENT_ON_TERMINATE &&
+            (*i)->state == csPSTATE_NOT_RUNNING)
+            ProcessStateChange((*i));
+    }
+}
+
+void csPluginProcessWatch::ProcessStateChange(csProcessState *state)
+{
+    if (time(NULL) > state->last_action) {
+        csActionGroupMap::iterator i = action_group.find(state->action_group);
+        if (i == action_group.end()) {
+            csLog::Log(csLog::Error, "%s: Can't find action group: %s", name.c_str(),
+                state->action_group.c_str());
+            return;
+        }
+        if (state->event == csPEVENT_ON_START) {
+            csLog::Log(csLog::Debug, "%s: Running on-start action-group: %s",
+                name.c_str(), i->first.c_str());
+        }
+        else if (state->event == csPEVENT_ON_TERMINATE) {
+            csLog::Log(csLog::Debug, "%s: Running on-terminate action-group: %s",
+                name.c_str(), i->first.c_str());
+        }
+        i->second->ResetDelayTimer(this);
+        state->last_action = time(NULL) + state->retry_delay;
     }
 }
 

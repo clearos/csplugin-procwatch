@@ -15,11 +15,13 @@ Requires: /sbin/service
 %else
 Requires: /usr/bin/systemctl
 %endif
+Requires: procps-ng
 BuildRequires: clearsync-devel >= 1.5
 BuildRequires: autoconf >= 2.63
 BuildRequires: automake
 BuildRequires: libtool
 BuildRequires: expat-devel
+BuildRequires: procps-ng-devel
 Summary: Process Watch ClearSync plugin
 Requires(pre): /sbin/ldconfig
 

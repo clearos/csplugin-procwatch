@@ -14,11 +14,14 @@ AC_PROG_INSTALL
 AM_PROG_LIBTOOL
 
 # Checks for libraries.
+AC_CHECK_LIB([procps], [openproc], [], [
+        AC_MSG_ERROR([libprocps not found but is required.])])
 
 # Checks for header files.
 AC_LANG_PUSH([C++])
 AC_CHECK_HEADERS([clearsync/csplugin.h], [], [AC_MSG_ERROR([clearsync header files not found.])])
 AC_LANG_POP([C++])
+AC_CHECK_HEADERS([proc/readproc.h], [], [AC_MSG_ERROR([procps header files not found.])])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL
