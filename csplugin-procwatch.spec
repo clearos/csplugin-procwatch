@@ -1,7 +1,7 @@
 # ClearSync Process Watch Plugin RPM spec
 Name: csplugin-procwatch
 Version: 1.0
-Release: 1%{dist}
+Release: 2%{dist}
 Vendor: ClearFoundation
 License: GPL
 Group: System/Plugins
