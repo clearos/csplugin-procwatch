@@ -64,17 +64,7 @@ void *csPluginProcessWatch::Entry(void)
     csTimer *refresh_timer = new csTimer(_CSPLUGIN_PROCWATCH_REFRESH_TIMER,
         conf->GetRefreshRate(), conf->GetRefreshRate(), this);
     refresh_timer->Start();
-#if 0
-    csProcessState *proc = new csProcessState;
-    proc->type = csPMATCH_TEXT;
-    proc->text = "master";
-    proc->pattern = NULL;
-    proc->state = csPSTATE_INIT;
-    proc->event = csPEVENT_ON_TERMINATE;
-    proc->action_taken = time(NULL);
 
-    proc_state.push_back(proc);
-#endif
     for (bool run = true; run; ) {
         csTimer *timer;
         csEvent *event = EventPopWait();
@@ -93,6 +83,7 @@ void *csPluginProcessWatch::Entry(void)
                 if (timer->GetId() == _CSPLUGIN_PROCWATCH_REFRESH_TIMER) {
                     ProcessTableRefresh();
                     ProcessStateUpdate();
+                    break;
                 }
                 for (csActionGroupMap::iterator i = action_group.begin();
                     i != action_group.end(); i++) {
