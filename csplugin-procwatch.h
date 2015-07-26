@@ -47,6 +47,7 @@ public:
         time_t retry_delay;
         time_t last_action;
         string action_group;
+        bool one_shot;
     } csProcessState;
 
     csPluginProcessWatch(const string &name,

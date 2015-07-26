@@ -143,6 +143,11 @@ void csPluginXmlParser::ParseProcWatchOpen(csXmlTag *tag)
                 tag->GetParamValue("retry-delay").c_str()
             );
         }
+        watch_conf->one_shot = false;
+        if (tag->ParamExists("one-shot")) {
+            watch_conf->one_shot =
+                (tag->GetParamValue("one-shot") == "true") ? true : false;
+        }
 
         tag->SetData((void *)watch_conf);
     }

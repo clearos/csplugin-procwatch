@@ -156,10 +156,15 @@ void csPluginProcessWatch::ProcessStateUpdate(void)
             if ((*i)->event == csPEVENT_ON_START &&
                 (*i)->state == csPSTATE_RUNNING)
                 ProcessStateChange((*i));
+            else if ((*i)->event == csPEVENT_ON_TERMINATE &&
+                (*i)->state == csPSTATE_NOT_RUNNING &&
+                (*i)->one_shot == true)
+                ProcessStateChange((*i));
         }
 
         if ((*i)->event == csPEVENT_ON_TERMINATE &&
-            (*i)->state == csPSTATE_NOT_RUNNING)
+            (*i)->state == csPSTATE_NOT_RUNNING &&
+            (*i)->one_shot == false)
             ProcessStateChange((*i));
     }
 }
