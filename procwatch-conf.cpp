@@ -144,7 +144,7 @@ void csPluginXmlParser::ParseProcWatchOpen(csXmlTag *tag)
             );
         }
         watch_conf->one_shot = false;
-        if (tag->ParamExists("one-shot")) {
+        if ((*tag) == "on-terminate" && tag->ParamExists("one-shot")) {
             watch_conf->one_shot =
                 (tag->GetParamValue("one-shot") == "true") ? true : false;
         }
