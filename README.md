@@ -8,7 +8,7 @@ ClearSync Plugin: Process Watch
 
 The process watch plugin uses the procps-ng API to watch processes for
 configurable events such as start-up and terminate, etc.  When an event occurs
-and associated "action-group" is executed.  Actions are delayed in a queue for
+an associated "action-group" is executed.  Actions are delayed in a queue for
 a configurable amount of time (in seconds) to prevent excessive executions from
 a rapid flood of events.
 

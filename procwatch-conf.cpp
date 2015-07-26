@@ -38,8 +38,6 @@ void csPluginConf::Reload(void)
 
 void csPluginXmlParser::ParseElementOpen(csXmlTag *tag)
 {
-    csPluginConf *_conf = static_cast<csPluginConf *>(conf);
-
     if ((*tag) == "action-group") {
         if (!stack.size() || (*stack.back()) != "plugin")
             ParseError("unexpected tag: " + tag->GetName());
@@ -69,7 +67,14 @@ void csPluginXmlParser::ParseElementClose(csXmlTag *tag)
 {
     csPluginConf *_conf = static_cast<csPluginConf *>(conf);
 
-    if ((*tag) == "action-group") {
+    if ((*tag) == "refresh-interval") {
+        if (!stack.size() || (*stack.back()) != "plugin")
+            ParseError("unexpected tag: " + tag->GetName());
+        _conf->refresh_rate = (unsigned int)atoi(tag->GetText().c_str());
+        if (_conf->refresh_rate == 0)
+            _conf->refresh_rate = _PROCWATCH_REFRESH_RATE;
+    }
+    else if ((*tag) == "action-group") {
         if (!stack.size() || (*stack.back()) != "plugin")
             ParseError("unexpected tag: " + tag->GetName());
         csActionGroup *action_group;
