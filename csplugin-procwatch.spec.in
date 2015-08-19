@@ -1,7 +1,7 @@
 # ClearSync Process Watch Plugin RPM spec
 Name: @PACKAGE_TARNAME@
 Version: @PACKAGE_VERSION@
-Release: 4%{dist}
+Release: 5%{dist}
 Vendor: ClearFoundation
 License: GPL
 Group: System/Plugins
@@ -43,8 +43,6 @@ make %{?_smp_mflags}
 make install DESTDIR=$RPM_BUILD_ROOT
 rm -f ${RPM_BUILD_ROOT}/%{_libdir}/libcsplugin-procwatch.a
 rm -f ${RPM_BUILD_ROOT}/%{_libdir}/libcsplugin-procwatch.la
-mkdir -vp ${RPM_BUILD_ROOT}/%{_sysconfdir}/clearsync.d
-cp -v csplugin-procwatch.conf ${RPM_BUILD_ROOT}/%{_sysconfdir}/clearsync.d
 
 # Clean-up
 %clean
@@ -88,6 +86,5 @@ cp -v csplugin-procwatch.conf ${RPM_BUILD_ROOT}/%{_sysconfdir}/clearsync.d
 # Files
 %files
 %defattr(-,root,root)
-%config(noreplace) %{_sysconfdir}/clearsync.d/csplugin-procwatch.conf
 %{_libdir}/libcsplugin-procwatch.so*
 
