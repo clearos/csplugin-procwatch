@@ -1,7 +1,7 @@
 # ClearSync Process Watch Plugin RPM spec
 Name: @PACKAGE_TARNAME@
 Version: @PACKAGE_VERSION@
-Release: 5%{dist}
+Release: 6%{dist}
 Vendor: ClearFoundation
 License: GPL
 Group: System/Plugins
@@ -54,7 +54,7 @@ rm -f ${RPM_BUILD_ROOT}/%{_libdir}/libcsplugin-procwatch.la
 %if "0%{dist}" == "0.v6"
 /sbin/service clearsyncd condrestart >/dev/null 2>&1 || :
 %else
-/usr/bin/systemctl restart clearsync -q
+/usr/bin/systemctl try-restart clearsync -q
 %endif
 
 # Add command(s) to sudo configuration
@@ -80,7 +80,7 @@ rm -f ${RPM_BUILD_ROOT}/%{_libdir}/libcsplugin-procwatch.la
 %if "0%{dist}" == "0.v6"
 /sbin/service clearsyncd condrestart >/dev/null 2>&1 || :
 %else
-/usr/bin/systemctl restart clearsync -q
+/usr/bin/systemctl try-restart clearsync -q
 %endif
 
 # Files
